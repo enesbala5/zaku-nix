@@ -69,11 +69,19 @@
               runHook postInstall
             '';
 
+            # patchelf rewrites DT_RPATH into DT_RUNPATH unless --force-rpath.
+            # RUNPATH is not used for a dependency's dependencies, so libxcb
+            # would not find libXau.so.6 in $out/lib.
             postFixup = ''
               patchelf \
                 --set-interpreter "$(< ${pkgs.stdenv.cc}/nix-support/dynamic-linker)" \
-                --add-rpath ${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]} \
+                --set-rpath '$ORIGIN/../lib:${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}' \
+                --force-rpath \
                 $out/libexec/zaku
+
+              for lib in $out/lib/*; do
+                patchelf --set-rpath '$ORIGIN' --force-rpath "$lib"
+              done
 
               makeWrapper $out/libexec/zaku $out/bin/zaku \
                 --prefix LD_LIBRARY_PATH : ${
